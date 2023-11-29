@@ -29,6 +29,15 @@ type User struct {
 	Address            string `json:"address"`
 	TrainingPreference string `json:"training"`
 	Premium            bool   `json:"premium"`
+	Admin              bool   `json:"admin"`
+}
+
+type Service struct {
+	Id          int     `json:"id"`
+	Title       string  `json:"title"`
+	Description string  `json:"description"`
+	Price       float32 `json:"price"`
+	Subscribers string  `json:"subscribers"`
 }
 
 func NewServer(c *mongo.Client) *Server {
@@ -78,6 +87,7 @@ func (s *Server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		"address":          "undefined",
 		"trainingPrefence": "undefined",
 		"premium":          false,
+		"admin":            false,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -171,6 +181,33 @@ func (s *Server) handleGetAllServices(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(results)
 }
 
+func (s *Server) handleCreateService(w http.ResponseWriter, r *http.Request) {
+	call := s.client.Database("academy").Collection("services")
+
+	var reqData Service
+	err := json.NewDecoder(r.Body).Decode(&reqData)
+
+	if err != nil {
+		http.Error(w, "Error parsing JSON", http.StatusBadRequest)
+	}
+
+	result, err := call.InsertOne(context.TODO(), bson.M{
+		"title": reqData.Title,
+		"description": reqData.Description,
+		"price": reqData.Price,
+		"subscribers": reqData.Subscribers,  
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Response do Servidor
+	w.WriteHeader(http.StatusOK)
+	w.Header().Add("Content-Type", "application/json")
+
+	json.NewEncoder(w).Encode(result)
+}
+
 func (s *Server) handleGetOneService(w http.ResponseWriter, r *http.Request) {
 	param := mux.Vars(r)
 	serviceId := param["id"]
@@ -241,6 +278,9 @@ func main() {
 
 	// FindServices
 	router.HandleFunc("/services", server.handleGetAllServices).Methods("GET")
+
+	// Create Service
+	router.HandleFunc("/services/create", server.handleCreateService).Methods("POST")
 
 	// FindOneService
 	router.HandleFunc("/services/{id}", server.handleGetOneService).Methods("GET")
